@@ -297,19 +297,42 @@
             font-size: 14px
         }
     </style>
+    <link rel="stylesheet" href="table.css">
 </head>
 <body>
 <div class="wrap">
-    <h1>♠ BLACKJACK ♥</h1>
+    <header class="masthead">
+        <div class="brand-mark" aria-hidden="true">♠</div>
+        <div class="brand"><span>LE CERCLE PRIVÉ</span><h1>Blackjack</h1></div>
+        <div class="masthead-note"><span>UNE TABLE ENTRE AMIS</span><b>Bonne chance.</b></div>
+    </header>
     <div id="login" class="panel">
-        <input id="pseudo" maxlength="14" placeholder="Ton pseudo">
-        <input id="code" maxlength="6" placeholder="Code de table (vide = nouvelle table)">
-        <button class="btn" id="go">Jouer en ligne</button>
-        <button class="btn alt" id="solo">Jouer en solo (sans Firebase)</button>
-        <div class="err" id="err"></div>
+        <div class="welcome-ornament" aria-hidden="true">♠ <span>♦</span> ♣</div>
+        <div class="eyebrow">BIENVENUE À LA TABLE</div>
+        <h2>Faites vos jeux<span>.</span></h2>
+        <p>Une partie entre amis, ou juste vous contre le croupier. La table est prête.</p>
+        <label for="pseudo">VOTRE PSEUDO</label>
+        <input id="pseudo" maxlength="14" placeholder="Comment vous appeler ?" autocomplete="nickname">
+        <label for="code">CODE DE LA TABLE <span>FACULTATIF</span></label>
+        <input id="code" maxlength="6" placeholder="Pour rejoindre une table" autocomplete="off">
+        <button class="btn" id="go">Rejoindre une table <span aria-hidden="true">↗</span></button>
+        <div class="login-divider"><span>ou</span></div>
+        <button class="btn alt" id="solo">Jouer en solo <span aria-hidden="true">→</span></button>
+        <div class="err" id="err" role="alert"></div>
     </div>
     <div id="game" hidden></div>
+    <details class="rules">
+        <summary>Règles de la table <span>＋</span></summary>
+        <div>
+            <p>Blackjack américain : 6 jeux, mise minimale de 10 jetons. L’as vaut 1 ou 11 ; les figures valent 10. Un blackjack naturel paie 3:2, une victoire 1:1, et une égalité rend la mise.</p>
+            <p>Le croupier vérifie son blackjack avec un as ou une carte de valeur 10, puis tire jusqu’à 17 et reste sur 17 souple. Avec un as visible, l’assurance coûte la moitié de la mise et paie 2:1 si le croupier a blackjack.</p>
+            <p>Séparez deux cartes de même rang jusqu’à 4 mains, doublez sur vos deux premières cartes (y compris après une séparation), ou abandonnez la moitié de votre mise initiale après vérification du croupier. Les as séparés reçoivent une seule carte ; un 21 après séparation n’est pas un blackjack naturel.</p>
+            <p>La partie utilise des jetons virtuels, sans argent réel. Un rachat volontaire est proposé lorsque le solde ne permet plus de miser.</p>
+        </div>
+    </details>
+    <footer class="site-footer"><span>♠ &nbsp; LE CERCLE PRIVÉ</span><span>LES BONS MOMENTS SE JOUENT À PLUSIEURS</span></footer>
 </div>
+<script src="blackjack-engine.js"></script>
 <script type="module">
     import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {getAuth, signInAnonymously} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -336,33 +359,7 @@
     const seen = new Set();
     let auth, db, uid, ref, room, code, pending = 0, unsub;
 
-    const val = h => {
-        let t = 0, a = 0;
-        for (const c of h) {
-            const r = c % 13;
-            if (r == 0) {
-                a++;
-                t += 11
-            } else t += r >= 9 ? 10 : r + 1
-        }
-        while (t > 21 && a) {
-            t -= 10;
-            a--
-        }
-        return t
-    };
-    const newShoe = () => {
-        const a = Array.from({length: 312}, (_, i) => i % 52);
-        for (let i = a.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [a[i], a[j]] = [a[j], a[i]]
-        }
-        return a
-    };
-    const draw = d => {
-        if (d.deck.length < 20) d.deck = newShoe();
-        return d.deck.pop()
-    };
+    const {value: val} = Blackjack;
     const rnd = () => Math.random().toString(36).slice(2, 6).toUpperCase();
     let solo = false;
     const tx = fn => solo ? (() => {
@@ -379,135 +376,27 @@
         t.set(ref, d)
     }).catch(e => alert(e.message));
 
-    // ---------- logique de jeu (exécutée dans des transactions) ----------
-    function checkDeal(d) {
-        const ps = d.order.map(u => d.players[u]);
-        if (ps.length && ps.every(p => p.st != 'bet') && ps.some(p => p.st == 'ready')) deal(d)
-    }
-
-    function deal(d) {
-        d.phase = 'play';
-        d.dealer = [draw(d), draw(d)];
-        d.msg = '';
-        for (const u of d.order) {
-            const p = d.players[u];
-            if (p.st == 'ready') {
-                p.hand = [draw(d), draw(d)];
-                p.st = val(p.hand) == 21 ? 'bj' : 'play'
-            } else p.st = 'wait'
-        }
-        if (val(d.dealer) == 21) dealerPlay(d); else nextTurn(d)
-    }
-
-    function nextTurn(d) {
-        const u = d.order.find(u => d.players[u].st == 'play');
-        if (u) {
-            d.turn = u;
-            d.turnAt = Date.now()
-        } else dealerPlay(d)
-    }
-
-    function dealerPlay(d) {
-        d.phase = 'done';
-        d.turn = null;
-        if (d.order.some(u => d.players[u].st == 'stand')) while (val(d.dealer) < 17) d.dealer.push(draw(d));
-        const dv = val(d.dealer), dbj = d.dealer.length == 2 && dv == 21;
-        for (const u of d.order) {
-            const p = d.players[u];
-            if (p.st == 'wait' || !p.bet) continue;
-            const pv = val(p.hand);
-            if (p.st == 'bust') {
-                p.res = 'Perdu'
-            } else if (p.st == 'bj') {
-                if (dbj) {
-                    p.chips += p.bet;
-                    p.res = 'Égalité'
-                } else {
-                    p.chips += Math.floor(p.bet * 2.5);
-                    p.res = 'Blackjack !'
-                }
-            } else if (dbj) {
-                p.res = 'Perdu'
-            } else if (dv > 21 || pv > dv) {
-                p.chips += p.bet * 2;
-                p.res = 'Gagné'
-            } else if (pv == dv) {
-                p.chips += p.bet;
-                p.res = 'Égalité'
-            } else p.res = 'Perdu'
-        }
-        d.msg = dv > 21 ? 'Le croupier dépasse 21 !' : dbj ? 'Blackjack du croupier' : 'Le croupier a ' + dv
-    }
-
     const act = {
         bet: () => {
-            if (pending <= 0) return;
+            if (pending < Blackjack.MIN_BET) return;
             const b = pending;
             pending = 0;
-            tx(d => {
-                const p = d.players[uid];
-                if (d.phase != 'bet' || p.st != 'bet' || b > p.chips) return false;
-                p.chips -= b;
-                p.bet = b;
-                p.st = 'ready';
-                checkDeal(d)
-            })
+            tx(d => Blackjack.bet(d, uid, b))
         },
-        hit: () => tx(d => {
-            const p = d.players[uid];
-            if (d.phase != 'play' || d.turn != uid) return false;
-            p.hand.push(draw(d));
-            const v = val(p.hand);
-            if (v > 21) {
-                p.st = 'bust';
-                nextTurn(d)
-            } else if (v == 21) {
-                p.st = 'stand';
-                nextTurn(d)
-            } else d.turnAt = Date.now()
-        }),
-        stand: () => tx(d => {
-            if (d.phase != 'play' || d.turn != uid) return false;
-            d.players[uid].st = 'stand';
-            nextTurn(d)
-        }),
-        dbl: () => tx(d => {
-            const p = d.players[uid];
-            if (d.phase != 'play' || d.turn != uid || p.hand.length != 2 || p.chips < p.bet) return false;
-            p.chips -= p.bet;
-            p.bet *= 2;
-            p.hand.push(draw(d));
-            p.st = val(p.hand) > 21 ? 'bust' : 'stand';
-            nextTurn(d)
-        }),
-        force: () => tx(d => {
-            if (d.phase != 'play' || !d.turn || Date.now() - d.turnAt < 20000) return false;
-            d.players[d.turn].st = 'stand';
-            nextTurn(d)
-        }),
-        again: () => tx(d => {
-            if (d.phase != 'done') return false;
-            d.round++;
-            d.dealer = [];
-            d.msg = '';
-            for (const u of d.order) {
-                const p = d.players[u];
-                p.hand = [];
-                p.bet = 0;
-                p.res = '';
-                if (p.chips < 10) p.chips = 1000;
-                p.st = 'bet'
-            }
-            d.phase = 'bet';
-            d.turn = null
-        }),
+        skip: () => tx(d => Blackjack.skip(d, uid)),
+        joinBet: () => tx(d => Blackjack.joinBet(d, uid)),
+        rebuy: () => tx(d => Blackjack.rebuy(d, uid)),
+        insure: () => tx(d => Blackjack.insurance(d, uid, true)),
+        decline: () => tx(d => Blackjack.insurance(d, uid, false)),
+        hit: () => tx(d => Blackjack.action(d, uid, 'hit')),
+        stand: () => tx(d => Blackjack.action(d, uid, 'stand')),
+        dbl: () => tx(d => Blackjack.action(d, uid, 'double')),
+        split: () => tx(d => Blackjack.action(d, uid, 'split')),
+        surrender: () => tx(d => Blackjack.action(d, uid, 'surrender')),
+        force: () => tx(d => Blackjack.force(d)),
+        again: () => tx(d => Blackjack.again(d)),
         leave: async () => {
-            await tx(d => {
-                const was = d.turn == uid;
-                delete d.players[uid];
-                d.order = d.order.filter(u => u != uid);
-                if (d.phase == 'play' && was) nextTurn(d); else if (d.phase == 'bet') checkDeal(d)
-            });
+            await tx(d => Blackjack.leave(d, uid));
             unsub && unsub();
             location.hash = '';
             location.reload()
@@ -530,28 +419,12 @@
             localStorage.pseudo = name;
             await runTransaction(db, async t => {
                 const s = await t.get(ref);
-                const d = s.exists() ? s.data() : {
-                    phase: 'bet',
-                    order: [],
-                    players: {},
-                    dealer: [],
-                    deck: newShoe(),
-                    turn: null,
-                    turnAt: 0,
-                    round: 0,
-                    msg: ''
-                };
+                const d = s.exists() ? s.data() : Blackjack.makeRoom();
+                if (d.version !== Blackjack.VERSION) throw Error('Cette table utilise les anciennes règles. Crée une nouvelle table avec un autre code.');
                 if (!d.players[uid]) {
                     if (d.order.length >= 6) throw Error('Table pleine (6 joueurs max).');
                     d.order.push(uid);
-                    d.players[uid] = {
-                        name,
-                        chips: 1000,
-                        bet: 0,
-                        hand: [],
-                        st: d.phase == 'bet' ? 'bet' : 'wait',
-                        res: ''
-                    }
+                    d.players[uid] = Blackjack.makePlayer(name, d.phase)
                 } else d.players[uid].name = name;
                 t.set(ref, d)
             });
@@ -573,17 +446,9 @@
         solo = true;
         uid = 'solo';
         code = 'SOLO';
-        room = {
-            phase: 'bet',
-            order: [uid],
-            players: {[uid]: {name, chips: 1000, bet: 0, hand: [], st: 'bet', res: ''}},
-            dealer: [],
-            deck: newShoe(),
-            turn: null,
-            turnAt: 0,
-            round: 0,
-            msg: ''
-        };
+        room = Blackjack.makeRoom();
+        room.order.push(uid);
+        room.players[uid] = Blackjack.makePlayer(name, room.phase);
         $('#login').hidden = true;
         $('#game').hidden = false;
         render()
@@ -599,18 +464,20 @@
         const n = !seen.has(k);
         seen.add(k);
         const nw = n ? ' new' : '';
-        if (hide) return `<div class="card back${nw}"></div>`;
+        if (hide) return `<div class="card back${nw}" aria-label="Carte cachée"><span aria-hidden="true">♠</span></div>`;
         const r = c % 13, s = Math.floor(c / 13) % 4;
-        return `<div class="card${s == 1 || s == 2 ? ' r' : ''}${nw}"><b>${RK[r]}</b><i>${SU[s]}</i><span>${SU[s]}</span></div>`
+        return `<div class="card${s == 1 || s == 2 ? ' r' : ''}${nw}" aria-label="${RK[r]} ${SU[s]}"><div class="card-corner"><b>${RK[r]}</b><i>${SU[s]}</i></div><span class="card-suit">${SU[s]}</span><div class="card-corner bottom"><b>${RK[r]}</b><i>${SU[s]}</i></div></div>`
     };
     const LAB = {
         bet: 'Mise en cours…',
         ready: 'Mise placée',
-        wait: 'Prochaine manche',
+        wait: 'En retrait',
+        broke: 'Solde insuffisant',
         bust: 'Bust !',
         stand: 'Reste',
         bj: 'Blackjack !',
-        play: 'À jouer'
+        play: 'À jouer',
+        surrender: 'Abandon'
     };
 
     function render() {
@@ -619,36 +486,52 @@
             $('#game').innerHTML = '<div class="panel">Tu as quitté la table.<button class="btn" onclick="location.reload()">Retour</button></div>';
             return
         }
-        const play = d.phase == 'play';
+        const play = d.phase == 'play', insurance = d.phase == 'insurance';
+        const hiddenDealer = play || insurance;
+        const active = Blackjack.current(d, uid);
         if (me.st != 'bet') pending = 0;
-        let h = `<div class="top"><div>${solo ? '<b>Mode solo</b>' : `Table <b>${code}</b> <small>${d.order.length}/6 joueurs</small>`}</div>
- <div>${solo ? '' : '<button class="btn alt" id="cp">Copier le lien</button> '}<button class="btn red" id="lv">Quitter</button></div></div>
- <div class="table"><div class="dealer"><h3>Croupier${d.dealer.length ? `<small>${play ? val([d.dealer[0]]) : val(d.dealer)}</small>` : ''}</h3>
- <div class="hand">${d.dealer.map((c, i) => card(c, `${d.round}|D|${i}`, play && i == 1)).join('')}</div></div>`;
+        let h = `<div class="top"><div class="table-info"><span class="live-dot"></span><span>${solo ? 'TABLE PRIVÉE' : 'TABLE EN LIGNE'}</span><b>${solo ? 'Mode solo' : esc(code)}</b><small>${solo ? 'Vous contre le croupier' : `${d.order.length}/6 joueurs`}</small></div>
+ <div class="top-actions">${solo ? '' : '<button class="btn alt" id="cp">Copier le lien</button> '}<button class="btn red" id="lv">Quitter</button></div></div>
+ <div class="table"><div class="felt"><div class="table-inscription" aria-hidden="true"><span>LE CERCLE PRIVÉ</span><strong>BLACKJACK</strong><small>LE CROUPIER RESTE À 17</small></div><div class="dealer"><div class="section-label"><span>LA MAISON</span><h3>Croupier${d.dealer.length ? `<small>${hiddenDealer ? val([d.dealer[0]]) : val(d.dealer)}</small>` : ''}</h3></div>
+ <div class="hand dealer-hand">${d.dealer.length ? d.dealer.map((c, i) => card(c, `${d.round}|D|${i}`, hiddenDealer && i == 1)).join('') : '<div class="card-placeholder" aria-hidden="true">♠</div>'}</div></div>`;
         const t = d.turn && d.players[d.turn];
-        h += `<div class="msg">${d.phase == 'bet' ? 'Placez vos mises !' : play ? (d.turn == uid ? 'À toi de jouer !' : `Tour de ${t ? t.name : ''}`) : d.msg}</div><div class="seats">`;
+        h += `<div class="msg" role="status"><span class="msg-diamond">✦</span> ${d.phase == 'bet' ? 'Placez vos mises' : insurance ? 'Assurance : faites votre choix' : play ? (d.turn == uid ? 'À vous de jouer' : `Tour de ${t ? esc(t.name) : ''}`) : esc(d.msg)} <span class="msg-diamond">✦</span></div><div class="seats">`;
         for (const u of d.order) {
-            const p = d.players[u],
-                cls = p.res ? (/Gagn|Black/.test(p.res) ? 'win' : p.res == 'Perdu' ? 'lose' : 'push') : '';
-            h += `<div class="seat${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><h4>${esc(p.name)}</h4>🪙 ${p.chips}${p.bet ? ` · mise ${p.bet}` : ''}
-  <div class="hand">${p.hand.map((c, i) => card(c, `${d.round}|${u}|${i}`)).join('')}</div>
-  ${p.hand.length ? `<small>${val(p.hand)}</small>` : ''}<br><span class="badge ${cls}">${p.res || LAB[p.st] || ''}</span></div>`
+            const p = d.players[u];
+            const hands = p.hands.length ? p.hands.map((hand, n) => {
+                const cls = hand.res ? (/Gagn|Black/.test(hand.res) ? 'win' : hand.res == 'Perdu' ? 'lose' : 'push') : '';
+                return `<div class="player-hand-group${play && d.turn == u && p.activeHand == n ? ' active-hand' : ''}">
+                    ${p.hands.length > 1 ? `<span class="hand-label">MAIN ${n + 1}</span>` : ''}
+                    <div class="hand player-hand">${hand.cards.map((c, i) => card(c, `${d.round}|${u}|${n}|${i}`)).join('')}</div>
+                    <div class="hand-info">${hand.cards.length ? `<small>${val(hand.cards)}</small>` : ''}<span>MISE ${hand.bet}</span></div>
+                    <span class="badge ${cls}">${hand.res || LAB[hand.st] || ''}</span></div>`;
+            }).join('') : '<div class="hand player-hand"><div class="betting-circle" aria-hidden="true">♠<span>VOTRE MISE</span></div></div>';
+            h += `<div class="seat${p.hands.length > 1 ? ' split-seat' : ''}${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><div class="player-hands">${hands}</div>
+  <div class="seat-details"><div class="seat-name"><h4>${esc(p.name)}</h4>${u == uid ? '<span>VOUS</span>' : ''}</div>
+  <div class="seat-balance"><span>◉ ${p.chips}</span>${p.insurance ? `<span>ASSURANCE ${p.insurance}${d.phase == 'done' ? (val(d.dealer) == 21 && d.dealer.length == 2 ? ' · GAGNÉE' : ' · PERDUE') : ''}</span>` : ''}</div>${p.hands.length ? '' : `<span class="badge">${LAB[p.st] || ''}</span>`}</div></div>`
         }
-        h += `</div></div><div class="ctrl">`;
+        h += `</div><div class="felt-bottom" aria-hidden="true"><span>♠</span><span>BONNE CHANCE</span><span>♠</span></div></div></div><div class="control-area"><div class="control-heading"><span>VOTRE ESPACE DE JEU</span><b>${d.phase == 'bet' ? (me.st == 'bet' ? 'Choisissez votre mise' : 'En attente des joueurs') : insurance ? 'Assurer votre mise ?' : play ? (d.turn == uid ? 'À vous de jouer' : 'La partie continue') : 'La manche est terminée'}</b></div><div class="ctrl">`;
         if (d.phase == 'bet' && me.st == 'bet') {
-            h += [10, 50, 100, 500].map(v => `<button class="chip c${v}" data-v="${v}">${v}</button>`).join('') +
-                `<div class="pend">Mise : <b>${pending}</b></div><button class="btn alt" id="clr">Effacer</button><button class="btn" id="ok"${pending ? '' : ' disabled'}>Miser</button>`
+            h += `<div class="chips">${[10, 50, 100, 500].map(v => `<button class="chip c${v}" data-v="${v}" aria-label="Ajouter ${v} à la mise"${pending + v > me.chips ? ' disabled' : ''}><span>${v}</span></button>`).join('')}</div>` +
+                `<div class="pend"><span>MISE ACTUELLE</span><b>${pending}</b></div><button class="btn alt" id="clr">Effacer</button>${solo ? '' : '<button class="btn alt" id="skip">Passer</button>'}<button class="btn" id="ok"${pending >= Blackjack.MIN_BET ? '' : ' disabled'}>Confirmer la mise <span aria-hidden="true">→</span></button>`
         } else if (d.phase == 'bet' && me.st == 'ready') h += '<span>En attente des autres joueurs…</span>';
-        else if (play && d.turn == uid) h += `<button class="btn" id="hit">Tirer</button><button class="btn alt" id="st">Rester</button>${me.hand.length == 2 && me.chips >= me.bet ? '<button class="btn alt" id="db">Doubler</button>' : ''}`;
-        else if (play && d.turn && Date.now() - d.turnAt > 20000) h += '<button class="btn red" id="fc">Joueur inactif : le faire rester</button>';
+        else if (d.phase == 'bet' && me.st == 'wait') h += '<button class="btn" id="join-bet">Revenir à la table</button>';
+        else if (d.phase == 'bet' && me.st == 'broke') h += '<button class="btn" id="rebuy">Racheter 1 000 jetons</button>';
+        else if (insurance && !me.insuranceDecided) h += `<span>Assurance : ${me.hands[0].bet / 2} jetons</span><button class="btn alt" id="decline">Non merci</button>${me.chips >= me.hands[0].bet / 2 ? '<button class="btn" id="insure">Assurer</button>' : ''}`;
+        else if (insurance) h += '<span>En attente des autres joueurs…</span>';
+        else if (active) h += `<button class="btn" id="hit">Tirer</button><button class="btn alt" id="st">Rester</button>${active.cards.length == 2 && me.chips >= active.bet ? '<button class="btn alt" id="db">Doubler</button>' : ''}${Blackjack.canSplit(me, active) ? '<button class="btn alt" id="split">Séparer</button>' : ''}${active.cards.length == 2 && !active.split ? '<button class="btn red" id="surrender">Abandonner</button>' : ''}`;
+        else if (play && d.turn && Date.now() - d.turnAt >= 20000) h += '<button class="btn red" id="fc">Joueur inactif : le faire rester</button>';
         else if (d.phase == 'done') h += '<button class="btn" id="nx">Manche suivante</button>';
+        if (insurance && me.insuranceDecided && Date.now() - d.turnAt >= 20000) h += '<button class="btn red" id="fc">Passer les joueurs inactifs</button>';
+        h += '</div></div>';
         $('#game').innerHTML = h;
         const on = (s, f) => {
             const e = $(s);
             if (e) e.onclick = f
         };
         document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
-            pending = Math.min(me.chips, pending + +b.dataset.v);
+            if (pending + +b.dataset.v > me.chips) return;
+            pending += +b.dataset.v;
             render()
         });
         on('#clr', () => {
@@ -656,9 +539,16 @@
             render()
         });
         on('#ok', act.bet);
+        on('#skip', act.skip);
+        on('#join-bet', act.joinBet);
+        on('#rebuy', act.rebuy);
+        on('#insure', act.insure);
+        on('#decline', act.decline);
         on('#hit', act.hit);
         on('#st', act.stand);
         on('#db', act.dbl);
+        on('#split', act.split);
+        on('#surrender', act.surrender);
         on('#fc', act.force);
         on('#nx', act.again);
         on('#lv', act.leave);
@@ -670,7 +560,7 @@
 
     const esc = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
     setInterval(() => {
-        if (room && room.phase == 'play' && room.turn != uid) render()
+        if (room && (room.phase == 'insurance' || room.phase == 'play' && room.turn != uid)) render()
     }, 5000);
 </script>
 </body>
