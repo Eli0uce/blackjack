@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Blackjack entre potes</title>
+    <style>
+        :root {
+            --g1: #10734a;
+            --g2: #06301f;
+            --gold: #e8c35a
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, Segoe UI, sans-serif;
+            color: #fff;
+            background: radial-gradient(ellipse at 50% 25%, var(--g1), var(--g2) 75%) fixed
+        }
+
+        button, input {
+            font: inherit
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 16px
+        }
+
+        h1 {
+            font-family: Georgia, serif;
+            color: var(--gold);
+            letter-spacing: 2px;
+            margin: .2em 0;
+            text-align: center
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, .35);
+            border: 1px solid rgba(232, 195, 90, .35);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 380px;
+            margin: 40px auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        input {
+            padding: 12px;
+            border-radius: 10px;
+            border: 0;
+            background: #fff;
+            color: #111
+        }
+
+        .btn {
+            background: linear-gradient(#f3d77a, #c9992b);
+            color: #2a1d00;
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 18px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #7a5a10
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: none
+        }
+
+        .btn.alt {
+            background: linear-gradient(#e9e9e9, #a9a9a9);
+            box-shadow: 0 3px 0 #555;
+            color: #111
+        }
+
+        .btn.red {
+            background: linear-gradient(#ff7b7b, #c42b2b);
+            color: #fff;
+            box-shadow: 0 3px 0 #6d1010
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: default
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .top small {
+            opacity: .8
+        }
+
+        .table {
+            margin-top: 10px;
+            border: 6px solid #5a3a1c;
+            border-radius: 140px/80px;
+            padding: 24px 16px;
+            background: radial-gradient(ellipse, #15905c, #0a4a2f);
+            box-shadow: inset 0 0 60px #0008, 0 10px 30px #000a
+        }
+
+        .dealer {
+            text-align: center
+        }
+
+        .dealer h3, .seat h4 {
+            margin: 4px 0;
+            font-weight: 600
+        }
+
+        .dealer small, .seat small {
+            background: #000a;
+            border-radius: 10px;
+            padding: 2px 8px;
+            margin-left: 6px
+        }
+
+        .hand {
+            display: flex;
+            justify-content: center;
+            min-height: 90px;
+            padding-left: 30px
+        }
+
+        .card {
+            width: 58px;
+            height: 84px;
+            margin-left: -30px;
+            background: #fff;
+            color: #111;
+            border-radius: 7px;
+            position: relative;
+            box-shadow: 0 3px 8px #0009;
+            font-family: Georgia, serif
+        }
+
+        .card.r {
+            color: #c4161c
+        }
+
+        .card b {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            font-size: 17px;
+            line-height: 1
+        }
+
+        .card i {
+            position: absolute;
+            top: 21px;
+            left: 6px;
+            font-style: normal;
+            font-size: 14px
+        }
+
+        .card span {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px
+        }
+
+        .card.back {
+            background: repeating-linear-gradient(45deg, #7b1620 0 6px, #a8232f 6px 12px);
+            border: 3px solid #fff
+        }
+
+        .card.new {
+            animation: deal .45s ease-out
+        }
+
+        @keyframes deal {
+            from {
+                transform: translate(0, -160px) rotate(-18deg);
+                opacity: 0
+            }
+        }
+
+        .msg {
+            text-align: center;
+            margin: 14px 0;
+            font-size: 18px;
+            color: var(--gold);
+            min-height: 26px;
+            font-weight: 600
+        }
+
+        .seats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center
+        }
+
+        .seat {
+            background: #0006;
+            border: 2px solid transparent;
+            border-radius: 14px;
+            padding: 10px;
+            min-width: 170px;
+            text-align: center
+        }
+
+        .seat.me {
+            border-color: #fff5
+        }
+
+        .seat.turn {
+            border-color: var(--gold);
+            box-shadow: 0 0 18px var(--gold)
+        }
+
+        .badge {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 13px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            background: #0008
+        }
+
+        .badge.win {
+            background: #1c9c4f
+        }
+
+        .badge.lose {
+            background: #b02a2a
+        }
+
+        .badge.push {
+            background: #777
+        }
+
+        .ctrl {
+            margin-top: 18px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .chip {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 4px dashed #fff9;
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #0007
+        }
+
+        .c10 {
+            background: #2b6fd6
+        }
+
+        .c50 {
+            background: #c42b2b
+        }
+
+        .c100 {
+            background: #222
+        }
+
+        .c500 {
+            background: #7b3fb0
+        }
+
+        .pend {
+            font-size: 20px;
+            min-width: 110px;
+            text-align: center
+        }
+
+        .err {
+            color: #ffb4b4;
+            font-size: 14px
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>♠ BLACKJACK ♥</h1>
+    <div id="login" class="panel">
+        <input id="pseudo" maxlength="14" placeholder="Ton pseudo">
+        <input id="code" maxlength="6" placeholder="Code de table (vide = nouvelle table)">
+        <button class="btn" id="go">Jouer en ligne</button>
+        <button class="btn alt" id="solo">Jouer en solo (sans Firebase)</button>
+        <div class="err" id="err"></div>
+    </div>
+    <div id="game" hidden></div>
+</div>
+<script type="module">
+    import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import {getAuth, signInAnonymously} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import {
+        getFirestore,
+        doc,
+        onSnapshot,
+        runTransaction
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    // ====== COLLE ICI TA CONFIG FIREBASE (Paramètres du projet > Tes applications > Web) ======
+    const firebaseConfig = {
+        apiKey: "AIzaSyBLp-Zo0frKDVgJxK8jMJy8XgyUYX8UbZY",
+        authDomain: "blackjack-f0078.firebaseapp.com",
+        projectId: "blackjack-f0078",
+        storageBucket: "blackjack-f0078.firebasestorage.app",
+        messagingSenderId: "997415071663",
+        appId: "1:997415071663:web:fecdd8420e970b628d895a"
+    };
+    // =========================================================================================
+
+    const $ = s => document.querySelector(s);
+    const SU = ['♠', '♥', '♦', '♣'], RK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const seen = new Set();
+    let auth, db, uid, ref, room, code, pending = 0, unsub;
+
+    const val = h => {
+        let t = 0, a = 0;
+        for (const c of h) {
+            const r = c % 13;
+            if (r == 0) {
+                a++;
+                t += 11
+            } else t += r >= 9 ? 10 : r + 1
+        }
+        while (t > 21 && a) {
+            t -= 10;
+            a--
+        }
+        return t
+    };
+    const newShoe = () => {
+        const a = Array.from({length: 312}, (_, i) => i % 52);
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]]
+        }
+        return a
+    };
+    const draw = d => {
+        if (d.deck.length < 20) d.deck = newShoe();
+        return d.deck.pop()
+    };
+    const rnd = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+    let solo = false;
+    const tx = fn => solo ? (() => {
+        const d = structuredClone(room);
+        if (fn(d) !== false) {
+            room = d;
+            render()
+        }
+    })() : runTransaction(db, async t => {
+        const s = await t.get(ref);
+        if (!s.exists()) return;
+        const d = s.data();
+        if (fn(d) === false) return;
+        t.set(ref, d)
+    }).catch(e => alert(e.message));
+
+    // ---------- logique de jeu (exécutée dans des transactions) ----------
+    function checkDeal(d) {
+        const ps = d.order.map(u => d.players[u]);
+        if (ps.length && ps.every(p => p.st != 'bet') && ps.some(p => p.st == 'ready')) deal(d)
+    }
+
+    function deal(d) {
+        d.phase = 'play';
+        d.dealer = [draw(d), draw(d)];
+        d.msg = '';
+        for (const u of d.order) {
+            const p = d.players[u];
+            if (p.st == 'ready') {
+                p.hand = [draw(d), draw(d)];
+                p.st = val(p.hand) == 21 ? 'bj' : 'play'
+            } else p.st = 'wait'
+        }
+        if (val(d.dealer) == 21) dealerPlay(d); else nextTurn(d)
+    }
+
+    function nextTurn(d) {
+        const u = d.order.find(u => d.players[u].st == 'play');
+        if (u) {
+            d.turn = u;
+            d.turnAt = Date.now()
+        } else dealerPlay(d)
+    }
+
+    function dealerPlay(d) {
+        d.phase = 'done';
+        d.turn = null;
+        if (d.order.some(u => d.players[u].st == 'stand')) while (val(d.dealer) < 17) d.dealer.push(draw(d));
+        const dv = val(d.dealer), dbj = d.dealer.length == 2 && dv == 21;
+        for (const u of d.order) {
+            const p = d.players[u];
+            if (p.st == 'wait' || !p.bet) continue;
+            const pv = val(p.hand);
+            if (p.st == 'bust') {
+                p.res = 'Perdu'
+            } else if (p.st == 'bj') {
+                if (dbj) {
+                    p.chips += p.bet;
+                    p.res = 'Égalité'
+                } else {
+                    p.chips += Math.floor(p.bet * 2.5);
+                    p.res = 'Blackjack !'
+                }
+            } else if (dbj) {
+                p.res = 'Perdu'
+            } else if (dv > 21 || pv > dv) {
+                p.chips += p.bet * 2;
+                p.res = 'Gagné'
+            } else if (pv == dv) {
+                p.chips += p.bet;
+                p.res = 'Égalité'
+            } else p.res = 'Perdu'
+        }
+        d.msg = dv > 21 ? 'Le croupier dépasse 21 !' : dbj ? 'Blackjack du croupier' : 'Le croupier a ' + dv
+    }
+
+    const act = {
+        bet: () => {
+            if (pending <= 0) return;
+            const b = pending;
+            pending = 0;
+            tx(d => {
+                const p = d.players[uid];
+                if (d.phase != 'bet' || p.st != 'bet' || b > p.chips) return false;
+                p.chips -= b;
+                p.bet = b;
+                p.st = 'ready';
+                checkDeal(d)
+            })
+        },
+        hit: () => tx(d => {
+            const p = d.players[uid];
+            if (d.phase != 'play' || d.turn != uid) return false;
+            p.hand.push(draw(d));
+            const v = val(p.hand);
+            if (v > 21) {
+                p.st = 'bust';
+                nextTurn(d)
+            } else if (v == 21) {
+                p.st = 'stand';
+                nextTurn(d)
+            } else d.turnAt = Date.now()
+        }),
+        stand: () => tx(d => {
+            if (d.phase != 'play' || d.turn != uid) return false;
+            d.players[uid].st = 'stand';
+            nextTurn(d)
+        }),
+        dbl: () => tx(d => {
+            const p = d.players[uid];
+            if (d.phase != 'play' || d.turn != uid || p.hand.length != 2 || p.chips < p.bet) return false;
+            p.chips -= p.bet;
+            p.bet *= 2;
+            p.hand.push(draw(d));
+            p.st = val(p.hand) > 21 ? 'bust' : 'stand';
+            nextTurn(d)
+        }),
+        force: () => tx(d => {
+            if (d.phase != 'play' || !d.turn || Date.now() - d.turnAt < 20000) return false;
+            d.players[d.turn].st = 'stand';
+            nextTurn(d)
+        }),
+        again: () => tx(d => {
+            if (d.phase != 'done') return false;
+            d.round++;
+            d.dealer = [];
+            d.msg = '';
+            for (const u of d.order) {
+                const p = d.players[u];
+                p.hand = [];
+                p.bet = 0;
+                p.res = '';
+                if (p.chips < 10) p.chips = 1000;
+                p.st = 'bet'
+            }
+            d.phase = 'bet';
+            d.turn = null
+        }),
+        leave: async () => {
+            await tx(d => {
+                const was = d.turn == uid;
+                delete d.players[uid];
+                d.order = d.order.filter(u => u != uid);
+                if (d.phase == 'play' && was) nextTurn(d); else if (d.phase == 'bet') checkDeal(d)
+            });
+            unsub && unsub();
+            location.hash = '';
+            location.reload()
+        }
+    };
+
+    // ---------- connexion ----------
+    async function join() {
+        const name = $('#pseudo').value.trim().slice(0, 14);
+        if (!name) return $('#err').textContent = 'Entre un pseudo.';
+        code = ($('#code').value.trim().toUpperCase()) || rnd();
+        try {
+            if (firebaseConfig.apiKey.startsWith('VOTRE')) throw Error('Configure d’abord firebaseConfig dans le fichier.');
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            await signInAnonymously(auth);
+            uid = auth.currentUser.uid;
+            ref = doc(db, 'rooms', code);
+            localStorage.pseudo = name;
+            await runTransaction(db, async t => {
+                const s = await t.get(ref);
+                const d = s.exists() ? s.data() : {
+                    phase: 'bet',
+                    order: [],
+                    players: {},
+                    dealer: [],
+                    deck: newShoe(),
+                    turn: null,
+                    turnAt: 0,
+                    round: 0,
+                    msg: ''
+                };
+                if (!d.players[uid]) {
+                    if (d.order.length >= 6) throw Error('Table pleine (6 joueurs max).');
+                    d.order.push(uid);
+                    d.players[uid] = {
+                        name,
+                        chips: 1000,
+                        bet: 0,
+                        hand: [],
+                        st: d.phase == 'bet' ? 'bet' : 'wait',
+                        res: ''
+                    }
+                } else d.players[uid].name = name;
+                t.set(ref, d)
+            });
+            location.hash = code;
+            $('#login').hidden = true;
+            $('#game').hidden = false;
+            unsub = onSnapshot(ref, s => {
+                room = s.data();
+                render()
+            });
+        } catch (e) {
+            $('#err').textContent = e.message
+        }
+    }
+
+    function startSolo() {
+        const name = $('#pseudo').value.trim().slice(0, 14) || 'Moi';
+        localStorage.pseudo = name;
+        solo = true;
+        uid = 'solo';
+        code = 'SOLO';
+        room = {
+            phase: 'bet',
+            order: [uid],
+            players: {[uid]: {name, chips: 1000, bet: 0, hand: [], st: 'bet', res: ''}},
+            dealer: [],
+            deck: newShoe(),
+            turn: null,
+            turnAt: 0,
+            round: 0,
+            msg: ''
+        };
+        $('#login').hidden = true;
+        $('#game').hidden = false;
+        render()
+    }
+
+    $('#go').onclick = join;
+    $('#solo').onclick = startSolo;
+    $('#pseudo').value = localStorage.pseudo || '';
+    if (location.hash) $('#code').value = location.hash.slice(1).toUpperCase();
+
+    // ---------- affichage ----------
+    const card = (c, k, hide) => {
+        const n = !seen.has(k);
+        seen.add(k);
+        const nw = n ? ' new' : '';
+        if (hide) return `<div class="card back${nw}"></div>`;
+        const r = c % 13, s = Math.floor(c / 13) % 4;
+        return `<div class="card${s == 1 || s == 2 ? ' r' : ''}${nw}"><b>${RK[r]}</b><i>${SU[s]}</i><span>${SU[s]}</span></div>`
+    };
+    const LAB = {
+        bet: 'Mise en cours…',
+        ready: 'Mise placée',
+        wait: 'Prochaine manche',
+        bust: 'Bust !',
+        stand: 'Reste',
+        bj: 'Blackjack !',
+        play: 'À jouer'
+    };
+
+    function render() {
+        const d = room, me = d.players[uid];
+        if (!me) {
+            $('#game').innerHTML = '<div class="panel">Tu as quitté la table.<button class="btn" onclick="location.reload()">Retour</button></div>';
+            return
+        }
+        const play = d.phase == 'play';
+        if (me.st != 'bet') pending = 0;
+        let h = `<div class="top"><div>${solo ? '<b>Mode solo</b>' : `Table <b>${code}</b> <small>${d.order.length}/6 joueurs</small>`}</div>
+ <div>${solo ? '' : '<button class="btn alt" id="cp">Copier le lien</button> '}<button class="btn red" id="lv">Quitter</button></div></div>
+ <div class="table"><div class="dealer"><h3>Croupier${d.dealer.length ? `<small>${play ? val([d.dealer[0]]) : val(d.dealer)}</small>` : ''}</h3>
+ <div class="hand">${d.dealer.map((c, i) => card(c, `${d.round}|D|${i}`, play && i == 1)).join('')}</div></div>`;
+        const t = d.turn && d.players[d.turn];
+        h += `<div class="msg">${d.phase == 'bet' ? 'Placez vos mises !' : play ? (d.turn == uid ? 'À toi de jouer !' : `Tour de ${t ? t.name : ''}`) : d.msg}</div><div class="seats">`;
+        for (const u of d.order) {
+            const p = d.players[u],
+                cls = p.res ? (/Gagn|Black/.test(p.res) ? 'win' : p.res == 'Perdu' ? 'lose' : 'push') : '';
+            h += `<div class="seat${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><h4>${esc(p.name)}</h4>🪙 ${p.chips}${p.bet ? ` · mise ${p.bet}` : ''}
+  <div class="hand">${p.hand.map((c, i) => card(c, `${d.round}|${u}|${i}`)).join('')}</div>
+  ${p.hand.length ? `<small>${val(p.hand)}</small>` : ''}<br><span class="badge ${cls}">${p.res || LAB[p.st] || ''}</span></div>`
+        }
+        h += `</div></div><div class="ctrl">`;
+        if (d.phase == 'bet' && me.st == 'bet') {
+            h += [10, 50, 100, 500].map(v => `<button class="chip c${v}" data-v="${v}">${v}</button>`).join('') +
+                `<div class="pend">Mise : <b>${pending}</b></div><button class="btn alt" id="clr">Effacer</button><button class="btn" id="ok"${pending ? '' : ' disabled'}>Miser</button>`
+        } else if (d.phase == 'bet' && me.st == 'ready') h += '<span>En attente des autres joueurs…</span>';
+        else if (play && d.turn == uid) h += `<button class="btn" id="hit">Tirer</button><button class="btn alt" id="st">Rester</button>${me.hand.length == 2 && me.chips >= me.bet ? '<button class="btn alt" id="db">Doubler</button>' : ''}`;
+        else if (play && d.turn && Date.now() - d.turnAt > 20000) h += '<button class="btn red" id="fc">Joueur inactif : le faire rester</button>';
+        else if (d.phase == 'done') h += '<button class="btn" id="nx">Manche suivante</button>';
+        $('#game').innerHTML = h;
+        const on = (s, f) => {
+            const e = $(s);
+            if (e) e.onclick = f
+        };
+        document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+            pending = Math.min(me.chips, pending + +b.dataset.v);
+            render()
+        });
+        on('#clr', () => {
+            pending = 0;
+            render()
+        });
+        on('#ok', act.bet);
+        on('#hit', act.hit);
+        on('#st', act.stand);
+        on('#db', act.dbl);
+        on('#fc', act.force);
+        on('#nx', act.again);
+        on('#lv', act.leave);
+        on('#cp', e => {
+            navigator.clipboard.writeText(location.href.split('#')[0] + '#' + code);
+            e.target.textContent = 'Copié !'
+        });
+    }
+
+    const esc = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+    setInterval(() => {
+        if (room && room.phase == 'play' && room.turn != uid) render()
+    }, 5000);
+</script>
+</body>
+</html>
