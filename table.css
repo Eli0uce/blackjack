@@ -4,6 +4,7 @@
     --muted: #b7c3ad;
     --gold: #d7bc7c;
     --ink: #0c211b;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 [hidden] { display: none !important; }
@@ -18,8 +19,10 @@ body {
 
 button, input { font: inherit; }
 button:focus-visible, input:focus-visible { outline: 3px solid #f6d990; outline-offset: 4px; }
-button { transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
-button:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-2px); }
+button { transition: transform 150ms var(--ease-out), filter 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+    button:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-2px); }
+}
 button:not(:disabled):active { transform: translateY(1px); }
 
 .wrap { max-width: 1440px; padding: 0 42px; }
@@ -183,6 +186,16 @@ button:not(:disabled):active { transform: translateY(1px); }
     color: #162d27;
 }
 .card.r { color: #a43137; }
+.card.dealt { animation: deal-card 200ms var(--ease-out) backwards; }
+.card.revealed { animation: reveal-card 200ms var(--ease-out); }
+@keyframes deal-card {
+    from { opacity: 0; transform: translateY(-35%) rotate(-8deg) scale(.97); }
+    to { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+@keyframes reveal-card {
+    from { opacity: .6; transform: perspective(500px) rotateY(70deg); }
+    to { opacity: 1; transform: perspective(500px) rotateY(0); }
+}
 .card .card-corner { position: absolute; top: 6px; left: 7px; display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
 .card .card-corner.bottom { top: auto; left: auto; right: 7px; bottom: 6px; transform: rotate(180deg); }
 .card .card-corner b, .card .card-corner i { position: static; font: 700 16px/1 Georgia, serif; }
@@ -227,6 +240,11 @@ button:not(:disabled):active { transform: translateY(1px); }
 .badge.win { background: #d0b779; color: #163225; }
 .badge.lose { background: #783e3c; }
 .badge.push { background: #5a6858; }
+.badge.result-new { animation: result-arrive 200ms var(--ease-out); }
+@keyframes result-arrive {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 .felt-bottom { display: flex; justify-content: center; gap: 16px; margin-top: 20px; color: #d7c58c91; font-size: 8px; }
 
 .control-area { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 38px 5px 25px; }
@@ -251,6 +269,11 @@ button:not(:disabled):active { transform: translateY(1px); }
 .pend { min-width: 100px; padding: 0 13px; border-left: 1px solid #b3bfa34d; text-align: left; }
 .pend > span { display: block; color: #a4b4a3; font-size: 8px; }
 .pend b { display: block; margin-top: 3px; color: var(--gold); font: 23px Georgia, serif; }
+.pend b.chip-feedback { animation: chip-arrive 150ms var(--ease-out); }
+@keyframes chip-arrive {
+    from { opacity: .6; transform: translateY(-6px) scale(.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .site-footer { display: flex; justify-content: space-between; gap: 16px; padding: 22px 0 28px; border-top: 1px solid #d5bd842a; color: #819285; font-size: 8px; }
 .rules { max-width: 720px; margin: 20px auto 28px; color: #b8c5b7; }
 .rules summary { display: flex; justify-content: space-between; gap: 20px; padding: 15px 0; border-top: 1px solid #d5bd8433; border-bottom: 1px solid #d5bd8433; color: var(--cream); cursor: pointer; font: 16px Georgia, serif; }
@@ -281,5 +304,12 @@ button:not(:disabled):active { transform: translateY(1px); }
     .site-footer span:last-child { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    button, button:not(:disabled):hover, button:not(:disabled):active { transform: none; transition: none; }
+    .card.dealt, .card.revealed, .badge.result-new, .pend b.chip-feedback {
+        animation: motion-fade 150ms ease both;
+    }
+    @keyframes motion-fade {
+        from { opacity: .6; }
+        to { opacity: 1; }
+    }
 }

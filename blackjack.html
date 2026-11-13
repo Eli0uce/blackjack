@@ -184,17 +184,6 @@
             border: 3px solid #fff
         }
 
-        .card.new {
-            animation: deal .45s ease-out
-        }
-
-        @keyframes deal {
-            from {
-                transform: translate(0, -160px) rotate(-18deg);
-                opacity: 0
-            }
-        }
-
         .msg {
             text-align: center;
             margin: 14px 0;
@@ -356,8 +345,8 @@
 
     const $ = s => document.querySelector(s);
     const SU = ['♠', '♥', '♦', '♣'], RK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    const seen = new Set();
-    let auth, db, uid, ref, room, code, pending = 0, unsub;
+    let auth, db, uid, ref, room, code, pending = 0, unsub, renderedRoom, keyboardMotion = false;
+    document.addEventListener('pointerdown', () => { keyboardMotion = false; });
 
     const {value: val} = Blackjack;
     const rnd = () => Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -460,13 +449,12 @@
     if (location.hash) $('#code').value = location.hash.slice(1).toUpperCase();
 
     // ---------- affichage ----------
-    const card = (c, k, hide) => {
-        const n = !seen.has(k);
-        seen.add(k);
-        const nw = n ? ' new' : '';
-        if (hide) return `<div class="card back${nw}" aria-label="Carte cachée"><span aria-hidden="true">♠</span></div>`;
+    const card = (c, motion, hide, delay = 0) => {
+        const animation = motion ? ` ${motion}` : '';
+        const timing = motion === 'dealt' ? ` style="animation-delay:${delay}ms"` : '';
+        if (hide) return `<div class="card back${animation}"${timing} aria-label="Carte cachée"><span aria-hidden="true">♠</span></div>`;
         const r = c % 13, s = Math.floor(c / 13) % 4;
-        return `<div class="card${s == 1 || s == 2 ? ' r' : ''}${nw}" aria-label="${RK[r]} ${SU[s]}"><div class="card-corner"><b>${RK[r]}</b><i>${SU[s]}</i></div><span class="card-suit">${SU[s]}</span><div class="card-corner bottom"><b>${RK[r]}</b><i>${SU[s]}</i></div></div>`
+        return `<div class="card${s == 1 || s == 2 ? ' r' : ''}${animation}"${timing} aria-label="${RK[r]} ${SU[s]}"><div class="card-corner"><b>${RK[r]}</b><i>${SU[s]}</i></div><span class="card-suit">${SU[s]}</span><div class="card-corner bottom"><b>${RK[r]}</b><i>${SU[s]}</i></div></div>`
     };
     const LAB = {
         bet: 'Mise en cours…',
@@ -480,7 +468,7 @@
         surrender: 'Abandon'
     };
 
-    function render() {
+    function render(chipFeedback = false) {
         const d = room, me = d.players[uid];
         if (!me) {
             $('#game').innerHTML = '<div class="panel">Tu as quitté la table.<button class="btn" onclick="location.reload()">Retour</button></div>';
@@ -488,23 +476,43 @@
         }
         const play = d.phase == 'play', insurance = d.phase == 'insurance';
         const hiddenDealer = play || insurance;
+        const previous = renderedRoom && renderedRoom.round === d.round ? renderedRoom : null;
+        const animateChanges = !!renderedRoom && !keyboardMotion;
+        let dealtCount = 0;
+        const dealMotion = () => ({motion: animateChanges ? 'dealt' : '', delay: Math.min(dealtCount++, 2) * 40});
+        const oldDealer = previous ? previous.dealer : [];
+        const dealerCard = (c, i) => {
+            const hidden = hiddenDealer && i === 1;
+            const wasHidden = previous && (previous.phase === 'play' || previous.phase === 'insurance') && i === 1 && i < oldDealer.length;
+            const animation = i >= oldDealer.length ? dealMotion() : {motion: animateChanges && wasHidden && !hidden ? 'revealed' : '', delay: 0};
+            return card(c, animation.motion, hidden, animation.delay);
+        };
         const active = Blackjack.current(d, uid);
         if (me.st != 'bet') pending = 0;
         let h = `<div class="top"><div class="table-info"><span class="live-dot"></span><span>${solo ? 'TABLE PRIVÉE' : 'TABLE EN LIGNE'}</span><b>${solo ? 'Mode solo' : esc(code)}</b><small>${solo ? 'Vous contre le croupier' : `${d.order.length}/6 joueurs`}</small></div>
  <div class="top-actions">${solo ? '' : '<button class="btn alt" id="cp">Copier le lien</button> '}<button class="btn red" id="lv">Quitter</button></div></div>
  <div class="table"><div class="felt"><div class="table-inscription" aria-hidden="true"><span>LE CERCLE PRIVÉ</span><strong>BLACKJACK</strong><small>LE CROUPIER RESTE À 17</small></div><div class="dealer"><div class="section-label"><span>LA MAISON</span><h3>Croupier${d.dealer.length ? `<small>${hiddenDealer ? val([d.dealer[0]]) : val(d.dealer)}</small>` : ''}</h3></div>
- <div class="hand dealer-hand">${d.dealer.length ? d.dealer.map((c, i) => card(c, `${d.round}|D|${i}`, hiddenDealer && i == 1)).join('') : '<div class="card-placeholder" aria-hidden="true">♠</div>'}</div></div>`;
+ <div class="hand dealer-hand">${d.dealer.length ? d.dealer.map(dealerCard).join('') : '<div class="card-placeholder" aria-hidden="true">♠</div>'}</div></div>`;
         const t = d.turn && d.players[d.turn];
         h += `<div class="msg" role="status"><span class="msg-diamond">✦</span> ${d.phase == 'bet' ? 'Placez vos mises' : insurance ? 'Assurance : faites votre choix' : play ? (d.turn == uid ? 'À vous de jouer' : `Tour de ${t ? esc(t.name) : ''}`) : esc(d.msg)} <span class="msg-diamond">✦</span></div><div class="seats">`;
         for (const u of d.order) {
             const p = d.players[u];
+            const oldCards = new Map();
+            if (previous && previous.players[u]) {
+                for (const hand of previous.players[u].hands) for (const c of hand.cards) oldCards.set(c, (oldCards.get(c) || 0) + 1);
+            }
             const hands = p.hands.length ? p.hands.map((hand, n) => {
                 const cls = hand.res ? (/Gagn|Black/.test(hand.res) ? 'win' : hand.res == 'Perdu' ? 'lose' : 'push') : '';
                 return `<div class="player-hand-group${play && d.turn == u && p.activeHand == n ? ' active-hand' : ''}">
                     ${p.hands.length > 1 ? `<span class="hand-label">MAIN ${n + 1}</span>` : ''}
-                    <div class="hand player-hand">${hand.cards.map((c, i) => card(c, `${d.round}|${u}|${n}|${i}`)).join('')}</div>
+                    <div class="hand player-hand">${hand.cards.map(c => {
+                        const count = oldCards.get(c) || 0;
+                        if (count) oldCards.set(c, count - 1);
+                        const animation = count ? {motion: '', delay: 0} : dealMotion();
+                        return card(c, animation.motion, false, animation.delay);
+                    }).join('')}</div>
                     <div class="hand-info">${hand.cards.length ? `<small>${val(hand.cards)}</small>` : ''}<span>MISE ${hand.bet}</span></div>
-                    <span class="badge ${cls}">${hand.res || LAB[hand.st] || ''}</span></div>`;
+                    <span class="badge ${cls}${hand.res && animateChanges && renderedRoom.phase !== 'done' ? ' result-new' : ''}">${hand.res || LAB[hand.st] || ''}</span></div>`;
             }).join('') : '<div class="hand player-hand"><div class="betting-circle" aria-hidden="true">♠<span>VOTRE MISE</span></div></div>';
             h += `<div class="seat${p.hands.length > 1 ? ' split-seat' : ''}${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><div class="player-hands">${hands}</div>
   <div class="seat-details"><div class="seat-name"><h4>${esc(p.name)}</h4>${u == uid ? '<span>VOUS</span>' : ''}</div>
@@ -513,7 +521,7 @@
         h += `</div><div class="felt-bottom" aria-hidden="true"><span>♠</span><span>BONNE CHANCE</span><span>♠</span></div></div></div><div class="control-area"><div class="control-heading"><span>VOTRE ESPACE DE JEU</span><b>${d.phase == 'bet' ? (me.st == 'bet' ? 'Choisissez votre mise' : 'En attente des joueurs') : insurance ? 'Assurer votre mise ?' : play ? (d.turn == uid ? 'À vous de jouer' : 'La partie continue') : 'La manche est terminée'}</b></div><div class="ctrl">`;
         if (d.phase == 'bet' && me.st == 'bet') {
             h += `<div class="chips">${[10, 50, 100, 500].map(v => `<button class="chip c${v}" data-v="${v}" aria-label="Ajouter ${v} à la mise"${pending + v > me.chips ? ' disabled' : ''}><span>${v}</span></button>`).join('')}</div>` +
-                `<div class="pend"><span>MISE ACTUELLE</span><b>${pending}</b></div><button class="btn alt" id="clr">Effacer</button>${solo ? '' : '<button class="btn alt" id="skip">Passer</button>'}<button class="btn" id="ok"${pending >= Blackjack.MIN_BET ? '' : ' disabled'}>Confirmer la mise <span aria-hidden="true">→</span></button>`
+                `<div class="pend"><span>MISE ACTUELLE</span><b${chipFeedback ? ' class="chip-feedback"' : ''}>${pending}</b></div><button class="btn alt" id="clr">Effacer</button>${solo ? '' : '<button class="btn alt" id="skip">Passer</button>'}<button class="btn" id="ok"${pending >= Blackjack.MIN_BET ? '' : ' disabled'}>Confirmer la mise <span aria-hidden="true">→</span></button>`
         } else if (d.phase == 'bet' && me.st == 'ready') h += '<span>En attente des autres joueurs…</span>';
         else if (d.phase == 'bet' && me.st == 'wait') h += '<button class="btn" id="join-bet">Revenir à la table</button>';
         else if (d.phase == 'bet' && me.st == 'broke') h += '<button class="btn" id="rebuy">Racheter 1 000 jetons</button>';
@@ -525,14 +533,26 @@
         if (insurance && me.insuranceDecided && Date.now() - d.turnAt >= 20000) h += '<button class="btn red" id="fc">Passer les joueurs inactifs</button>';
         h += '</div></div>';
         $('#game').innerHTML = h;
+        renderedRoom = structuredClone(d);
         const on = (s, f) => {
             const e = $(s);
-            if (e) e.onclick = f
+            if (e) e.onclick = event => {
+                if (event && event.detail === 0) keyboardMotion = true;
+                f(event);
+            }
         };
-        document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.chip').forEach(b => b.onclick = event => {
             if (pending + +b.dataset.v > me.chips) return;
+            if (event && event.detail === 0) keyboardMotion = true;
+            const restoreFocus = document.activeElement === b;
+            const value = b.dataset.v;
             pending += +b.dataset.v;
-            render()
+            render(!!event && event.detail > 0);
+            if (restoreFocus) {
+                const next = $(`.chip[data-v="${value}"]`);
+                if (next && !next.disabled) next.focus({preventScroll: true});
+                else $('#clr').focus({preventScroll: true});
+            }
         });
         on('#clr', () => {
             pending = 0;
