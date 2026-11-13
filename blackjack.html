@@ -346,6 +346,8 @@
     const $ = s => document.querySelector(s);
     const SU = ['♠', '♥', '♦', '♣'], RK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     let auth, db, uid, ref, room, code, pending = 0, unsub, renderedRoom, keyboardMotion = false;
+    let dealingTimer, dealing = false;
+    const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.addEventListener('pointerdown', () => { keyboardMotion = false; });
 
     const {value: val} = Blackjack;
@@ -355,7 +357,7 @@
         const d = structuredClone(room);
         if (fn(d) !== false) {
             room = d;
-            render()
+            present()
         }
     })() : runTransaction(db, async t => {
         const s = await t.get(ref);
@@ -422,7 +424,7 @@
             $('#game').hidden = false;
             unsub = onSnapshot(ref, s => {
                 room = s.data();
-                render()
+                present()
             });
         } catch (e) {
             $('#err').textContent = e.message
@@ -468,8 +470,86 @@
         surrender: 'Abandon'
     };
 
-    function render(chipFeedback = false) {
-        const d = room, me = d.players[uid];
+    function present() {
+        clearTimeout(dealingTimer);
+        dealing = false;
+        const previous = renderedRoom && renderedRoom.round === room.round ? renderedRoom : null;
+        if (!previous || keyboardMotion || reducedMotion()) {
+            render();
+            return;
+        }
+
+        const initialDeal = previous.phase === 'bet' && room.dealer.length >= 2;
+        const dealerDraws = (previous.phase === 'play' || previous.phase === 'insurance') &&
+            room.phase === 'done' && room.dealer.length > previous.dealer.length;
+        const addedCards = [];
+        for (const u of room.order) {
+            const old = new Map();
+            if (previous.players[u]) for (const hand of previous.players[u].hands) {
+                for (const c of hand.cards) old.set(c, (old.get(c) || 0) + 1);
+            }
+            room.players[u].hands.forEach((hand, n) => hand.cards.forEach(c => {
+                if (old.get(c)) old.set(c, old.get(c) - 1);
+                else addedCards.push({u, n, card: c});
+            }));
+        }
+        if (!initialDeal && !dealerDraws && addedCards.length < 2 && !(room.phase === 'done' && addedCards.length)) {
+            render();
+            return;
+        }
+
+        const stage = structuredClone(room);
+        const cards = [];
+        for (const u of stage.order) {
+            const p = stage.players[u];
+            if (initialDeal) for (const hand of p.hands) hand.cards = [];
+            else {
+                for (const hand of p.hands) hand.cards = [...hand.cards];
+                for (const added of addedCards.filter(item => item.u === u)) {
+                    const hand = p.hands[added.n];
+                    hand.cards.splice(hand.cards.lastIndexOf(added.card), 1);
+                }
+            }
+            if (previous.players[u]) p.chips = previous.players[u].chips;
+        }
+        stage.dealer = initialDeal ? [] : [...previous.dealer];
+        stage.phase = 'play';
+        stage.turn = null;
+        stage.msg = '';
+        if (initialDeal) {
+            for (let i = 0; i < 2; i++) {
+                for (const u of room.order) {
+                    const hand = room.players[u].hands[0];
+                    if (hand && hand.cards.length > i) cards.push(() => stage.players[u].hands[0].cards.push(hand.cards[i]));
+                }
+                cards.push(() => stage.dealer.push(room.dealer[i]));
+            }
+        } else {
+            for (const added of addedCards) cards.push(() => stage.players[added.u].hands[added.n].cards.push(added.card));
+        }
+        if (room.phase === 'done') {
+            cards.push(() => { stage.phase = 'done'; });
+            for (let i = initialDeal ? 2 : previous.dealer.length; i < room.dealer.length; i++) {
+                cards.push(() => stage.dealer.push(room.dealer[i]));
+            }
+        }
+        dealing = true;
+        let index = 0;
+        const next = () => {
+            if (index === cards.length) {
+                dealing = false;
+                render();
+                return;
+            }
+            cards[index++]();
+            render(false, stage, true);
+            dealingTimer = setTimeout(next, 240);
+        };
+        next();
+    }
+
+    function render(chipFeedback = false, d = room, inFlight = false) {
+        const me = d.players[uid];
         if (!me) {
             $('#game').innerHTML = '<div class="panel">Tu as quitté la table.<button class="btn" onclick="location.reload()">Retour</button></div>';
             return
@@ -479,7 +559,7 @@
         const previous = renderedRoom && renderedRoom.round === d.round ? renderedRoom : null;
         const animateChanges = !!renderedRoom && !keyboardMotion;
         let dealtCount = 0;
-        const dealMotion = () => ({motion: animateChanges ? 'dealt' : '', delay: Math.min(dealtCount++, 2) * 40});
+        const dealMotion = () => ({motion: animateChanges ? 'dealt' : '', delay: inFlight ? 0 : Math.min(dealtCount++, 2) * 40});
         const oldDealer = previous ? previous.dealer : [];
         const dealerCard = (c, i) => {
             const hidden = hiddenDealer && i === 1;
@@ -494,7 +574,7 @@
  <div class="table"><div class="felt"><div class="table-inscription" aria-hidden="true"><span>LE CERCLE PRIVÉ</span><strong>BLACKJACK</strong><small>LE CROUPIER RESTE À 17</small></div><div class="dealer"><div class="section-label"><span>LA MAISON</span><h3>Croupier${d.dealer.length ? `<small>${hiddenDealer ? val([d.dealer[0]]) : val(d.dealer)}</small>` : ''}</h3></div>
  <div class="hand dealer-hand">${d.dealer.length ? d.dealer.map(dealerCard).join('') : '<div class="card-placeholder" aria-hidden="true">♠</div>'}</div></div>`;
         const t = d.turn && d.players[d.turn];
-        h += `<div class="msg" role="status"><span class="msg-diamond">✦</span> ${d.phase == 'bet' ? 'Placez vos mises' : insurance ? 'Assurance : faites votre choix' : play ? (d.turn == uid ? 'À vous de jouer' : `Tour de ${t ? esc(t.name) : ''}`) : esc(d.msg)} <span class="msg-diamond">✦</span></div><div class="seats">`;
+        h += `<div class="msg" role="status"><span class="msg-diamond">✦</span> ${inFlight ? 'Distribution des cartes…' : d.phase == 'bet' ? 'Placez vos mises' : insurance ? 'Assurance : faites votre choix' : play ? (d.turn == uid ? 'À vous de jouer' : `Tour de ${t ? esc(t.name) : ''}`) : esc(d.msg)} <span class="msg-diamond">✦</span></div><div class="seats">`;
         for (const u of d.order) {
             const p = d.players[u];
             const oldCards = new Map();
@@ -512,14 +592,17 @@
                         return card(c, animation.motion, false, animation.delay);
                     }).join('')}</div>
                     <div class="hand-info">${hand.cards.length ? `<small>${val(hand.cards)}</small>` : ''}<span>MISE ${hand.bet}</span></div>
-                    <span class="badge ${cls}${hand.res && animateChanges && renderedRoom.phase !== 'done' ? ' result-new' : ''}">${hand.res || LAB[hand.st] || ''}</span></div>`;
+                    <span class="badge ${cls}${!inFlight && hand.res && animateChanges && renderedRoom.phase !== 'done' ? ' result-new' : ''}">${inFlight ? '' : hand.res || LAB[hand.st] || ''}</span></div>`;
             }).join('') : '<div class="hand player-hand"><div class="betting-circle" aria-hidden="true">♠<span>VOTRE MISE</span></div></div>';
-            h += `<div class="seat${p.hands.length > 1 ? ' split-seat' : ''}${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><div class="player-hands">${hands}</div>
+            const wager = u === uid && d.phase === 'bet' && p.st === 'bet' ? pending : p.hands.reduce((sum, hand) => sum + hand.bet, 0);
+            const stack = wager ? `<div class="table-wager${u === uid ? ' my-wager' : ''}" aria-label="Mise sur la table : ${wager} jetons"><span class="table-chip" aria-hidden="true">♠</span><b>${wager}</b></div>` : `<div class="table-wager wager-empty${u === uid ? ' my-wager' : ''}" aria-hidden="true"></div>`;
+            h += `<div class="seat${p.hands.length > 1 ? ' split-seat' : ''}${u == uid ? ' me' : ''}${d.turn == u ? ' turn' : ''}"><div class="player-hands">${hands}</div>${stack}
   <div class="seat-details"><div class="seat-name"><h4>${esc(p.name)}</h4>${u == uid ? '<span>VOUS</span>' : ''}</div>
   <div class="seat-balance"><span>◉ ${p.chips}</span>${p.insurance ? `<span>ASSURANCE ${p.insurance}${d.phase == 'done' ? (val(d.dealer) == 21 && d.dealer.length == 2 ? ' · GAGNÉE' : ' · PERDUE') : ''}</span>` : ''}</div>${p.hands.length ? '' : `<span class="badge">${LAB[p.st] || ''}</span>`}</div></div>`
         }
-        h += `</div><div class="felt-bottom" aria-hidden="true"><span>♠</span><span>BONNE CHANCE</span><span>♠</span></div></div></div><div class="control-area"><div class="control-heading"><span>VOTRE ESPACE DE JEU</span><b>${d.phase == 'bet' ? (me.st == 'bet' ? 'Choisissez votre mise' : 'En attente des joueurs') : insurance ? 'Assurer votre mise ?' : play ? (d.turn == uid ? 'À vous de jouer' : 'La partie continue') : 'La manche est terminée'}</b></div><div class="ctrl">`;
-        if (d.phase == 'bet' && me.st == 'bet') {
+        h += `</div><div class="felt-bottom" aria-hidden="true"><span>♠</span><span>BONNE CHANCE</span><span>♠</span></div></div></div><div class="control-area"><div class="control-heading"><span>VOTRE ESPACE DE JEU</span><b>${inFlight ? 'Distribution en cours' : d.phase == 'bet' ? (me.st == 'bet' ? 'Choisissez votre mise' : 'En attente des joueurs') : insurance ? 'Assurer votre mise ?' : play ? (d.turn == uid ? 'À vous de jouer' : 'La partie continue') : 'La manche est terminée'}</b></div><div class="ctrl">`;
+        if (inFlight) h += '<span>Distribution en cours…</span>';
+        else if (d.phase == 'bet' && me.st == 'bet') {
             h += `<div class="chips">${[10, 50, 100, 500].map(v => `<button class="chip c${v}" data-v="${v}" aria-label="Ajouter ${v} à la mise"${pending + v > me.chips ? ' disabled' : ''}><span>${v}</span></button>`).join('')}</div>` +
                 `<div class="pend"><span>MISE ACTUELLE</span><b${chipFeedback ? ' class="chip-feedback"' : ''}>${pending}</b></div><button class="btn alt" id="clr">Effacer</button>${solo ? '' : '<button class="btn alt" id="skip">Passer</button>'}<button class="btn" id="ok"${pending >= Blackjack.MIN_BET ? '' : ' disabled'}>Confirmer la mise <span aria-hidden="true">→</span></button>`
         } else if (d.phase == 'bet' && me.st == 'ready') h += '<span>En attente des autres joueurs…</span>';
@@ -546,8 +629,10 @@
             if (event && event.detail === 0) keyboardMotion = true;
             const restoreFocus = document.activeElement === b;
             const value = b.dataset.v;
+            const origin = event && event.detail > 0 && !reducedMotion() ? b.getBoundingClientRect() : null;
             pending += +b.dataset.v;
             render(!!event && event.detail > 0);
+            if (origin) flyChip(origin, value);
             if (restoreFocus) {
                 const next = $(`.chip[data-v="${value}"]`);
                 if (next && !next.disabled) next.focus({preventScroll: true});
@@ -578,9 +663,30 @@
         });
     }
 
+    function flyChip(origin, value) {
+        const target = $('.my-wager .table-chip');
+        if (!target || typeof target.animate !== 'function') return;
+        const destination = target.getBoundingClientRect();
+        const chip = document.createElement('span');
+        chip.className = `flying-chip c${value}`;
+        chip.textContent = value;
+        chip.setAttribute('aria-hidden', 'true');
+        chip.style.left = `${origin.left + origin.width / 2}px`;
+        chip.style.top = `${origin.top + origin.height / 2}px`;
+        document.body.append(chip);
+        const x = destination.left + destination.width / 2 - (origin.left + origin.width / 2);
+        const y = destination.top + destination.height / 2 - (origin.top + origin.height / 2);
+        const animation = chip.animate([
+            {transform: 'translate(-50%, -50%) scale(1)', opacity: 1},
+            {transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(.7)`, opacity: 1}
+        ], {duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)'});
+        animation.onfinish = () => chip.remove();
+        animation.oncancel = () => chip.remove();
+    }
+
     const esc = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
     setInterval(() => {
-        if (room && (room.phase == 'insurance' || room.phase == 'play' && room.turn != uid)) render()
+        if (!dealing && room && (room.phase == 'insurance' || room.phase == 'play' && room.turn != uid)) render()
     }, 5000);
 </script>
 </body>

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function openGame() {
+function openGame({reducedMotion = true} = {}) {
     const html = fs.readFileSync('blackjack.html', 'utf8');
     const engine = fs.readFileSync('blackjack-engine.js', 'utf8');
     const moduleScript = html.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
@@ -25,14 +25,25 @@ function openGame() {
             }
         }
     });
+    let activeTimer, sequence = 0;
+    const flights = [];
+    const wagerTarget = {getBoundingClientRect: () => ({left: 100, top: 150, width: 30, height: 30}), animate() {}};
     const document = {
-        querySelector: selector => elements[selector.slice(1)] || controls[selector.slice(1)] || null,
+        querySelector: selector => selector === '.my-wager .table-chip'
+            ? (markup.includes('table-chip') ? wagerTarget : null)
+            : elements[selector.slice(1)] || controls[selector.slice(1)] || null,
         querySelectorAll: selector => selector === '.chip' ? chips : [],
-        addEventListener() {}
+        addEventListener() {},
+        body: {append(node) { flights.push(node); }},
+        createElement: () => ({style: {}, setAttribute() {}, remove() { this.removed = true; },
+            animate(frames, options) { this.frames = frames; this.options = options; return this.animation = {}; }})
     };
     const backend = {room: null, listeners: []};
     const auth = {currentUser: {uid: 'online-player'}};
-    const context = {document, localStorage: {}, location: {hash: '', href: 'https://example.test/', reload() {}},
+    const context = {document, window: {matchMedia: () => ({matches: reducedMotion})},
+        setTimeout: fn => { activeTimer = {id: ++sequence, fn}; return sequence; },
+        clearTimeout: id => { if (activeTimer && activeTimer.id === id) activeTimer = null; },
+        localStorage: {}, location: {hash: '', href: 'https://example.test/', reload() {}},
         navigator: {clipboard: {writeText() {}}}, setInterval() {}, structuredClone, console,
         alert: message => { throw Error(message); }, initializeApp: () => ({}), getAuth: () => auth,
         getFirestore: () => ({}), signInAnonymously: async () => {}, doc: () => ({}),
@@ -55,7 +66,8 @@ function openGame() {
     vm.createContext(context);
     vm.runInContext(engine, context);
     vm.runInContext(moduleScript + '\nglobalThis.testUI = {getRoom: () => room, render};', context);
-    return {html, elements, context, backend, get markup() { return markup; }, get controls() { return controls; },
+    return {html, elements, context, backend, flights, tick() { const timer = activeTimer; activeTimer = null; if (timer) timer.fn(); },
+        get hasTimer() { return !!activeTimer; }, get markup() { return markup; }, get controls() { return controls; },
         get chips() { return chips; }};
 }
 
@@ -190,4 +202,108 @@ test('motion respects reduced-motion preference and touch hover', () => {
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
     assert.match(css, /animation: motion-fade 150ms ease both/);
     assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)/);
+});
+
+test('initial deal follows real order, one card per tick, without showing results early', () => {
+    const ui = openGame({reducedMotion: false});
+    ui.elements.solo.onclick();
+    ui.context.testUI.getRoom().deck = [...Array(160).fill(1), 7, 5, 9, 8];
+    ui.chips[0].onclick();
+    ui.controls.ok.onclick();
+    assert.match(ui.markup, /Distribution des cartes/);
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 1);
+    assert.equal(ui.controls.hit, undefined);
+    ui.tick();
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 2);
+    ui.tick();
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 3);
+    ui.tick();
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 4);
+    assert.match(ui.markup, /Carte cachée/);
+    ui.tick();
+    assert.ok(ui.controls.hit);
+    assert.equal(ui.hasTimer, false);
+});
+
+test('dealer reveals before drawing cards one at a time', () => {
+    const ui = openGame({reducedMotion: false});
+    ui.elements.solo.onclick();
+    ui.context.testUI.getRoom().deck = [...Array(160).fill(1), 9, 5, 9, 8, 9];
+    ui.chips[0].onclick();
+    ui.controls.ok.onclick();
+    while (ui.hasTimer) ui.tick();
+    ui.controls.st.onclick();
+    assert.match(ui.markup, /Distribution des cartes/);
+    assert.doesNotMatch(ui.markup, /Carte cachée/);
+    assert.doesNotMatch(ui.markup, /Manche suivante/);
+    ui.tick();
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 5);
+    ui.tick();
+    assert.ok(ui.controls.nx);
+});
+
+test('wagers appear on the table and reset with the bet', () => {
+    const ui = openGame();
+    ui.elements.solo.onclick();
+    ui.chips[0].onclick();
+    assert.match(ui.markup, /Mise sur la table : 10 jetons/);
+    ui.chips[1].onclick();
+    assert.match(ui.markup, /Mise sur la table : 60 jetons/);
+    ui.controls.clr.onclick();
+    assert.doesNotMatch(ui.markup, /Mise sur la table :/);
+});
+
+test('split cards arrive individually before the controls return', () => {
+    const ui = openGame({reducedMotion: false});
+    ui.elements.solo.onclick();
+    ui.context.testUI.getRoom().deck = [...Array(160).fill(1), 4, 0, 4, 7, 22, 9, 9];
+    ui.chips[0].onclick();
+    ui.controls.ok.onclick();
+    while (ui.hasTimer) ui.tick();
+    ui.controls.split.onclick();
+    assert.match(ui.markup, /Distribution des cartes/);
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 5);
+    ui.tick();
+    assert.equal((ui.markup.match(/class="card(?: |")/g) || []).length, 6);
+    ui.tick();
+    assert.ok(ui.controls.db);
+});
+
+test('reduced motion presents the complete state immediately', () => {
+    const ui = openGame();
+    ui.elements.solo.onclick();
+    ui.context.testUI.getRoom().deck = [...Array(160).fill(1), 7, 5, 9, 8];
+    ui.chips[0].onclick();
+    ui.controls.ok.onclick();
+    assert.equal(ui.hasTimer, false);
+    assert.ok(ui.controls.hit);
+});
+
+test('new online snapshots interrupt outdated dealing without reverting the game', async () => {
+    const ui = openGame({reducedMotion: false});
+    ui.elements.pseudo.value = 'Alice';
+    await ui.elements.go.onclick();
+    ui.backend.room.deck = [...Array(160).fill(1), 7, 5, 9, 8];
+    ui.chips[0].onclick();
+    ui.controls.ok.onclick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(ui.hasTimer, true);
+    ui.backend.room.msg = 'Nouvelle mise à jour';
+    ui.backend.listeners[0]({data: () => structuredClone(ui.backend.room)});
+    assert.equal(ui.hasTimer, false);
+    assert.ok(ui.controls.hit);
+    ui.tick();
+    assert.ok(ui.controls.hit);
+});
+
+test('a pointer bet travels from its chip to the wager and cleans up', () => {
+    const ui = openGame({reducedMotion: false});
+    ui.elements.solo.onclick();
+    ui.chips[0].getBoundingClientRect = () => ({left: 20, top: 400, width: 50, height: 50});
+    ui.chips[0].onclick({detail: 1});
+    assert.equal(ui.flights.length, 1);
+    assert.equal(ui.flights[0].options.duration, 260);
+    assert.match(ui.flights[0].frames[1].transform, /70px.*-260px/);
+    ui.flights[0].animation.onfinish();
+    assert.equal(ui.flights[0].removed, true);
 });
