@@ -437,6 +437,9 @@ body:has(#game:not([hidden])) .site-footer,
 }
 #game .table-navigation select:focus-visible { outline: 3px solid #f6d990; outline-offset: 3px; }
 #game .control-area {
+    position: relative;
+    z-index: 1;
+    margin-top: 16px;
     padding: 0 0 4px;
     display: flex;
     flex-wrap: wrap;
@@ -466,6 +469,10 @@ body:has(#game:not([hidden])) .site-footer,
     #game .table-navigation select { flex: 1 1 0; min-width: 0; }
 }
 @media (max-height: 600px) {
+    #game .control-area { margin-top: 0; }
+    #game .table {
+        box-shadow: inset 0 0 0 4px #291b12, inset 0 0 0 7px #a17b4a, 0 4px 0 #291b13, 0 8px 16px #0009;
+    }
     #game .felt { padding: 5px; }
     #game .dealer h3 { margin-bottom: 0; font-size: 16px; }
     #game .msg { margin: 2px 0; font-size: 14px; }
