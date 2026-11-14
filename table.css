@@ -128,10 +128,13 @@ button:not(:disabled):active { transform: translateY(1px); }
     position: relative;
     margin: 0;
     padding: 17px;
-    border: 2px solid #80613d;
+    border: 2px solid #a17b4a;
     border-radius: 105px 105px 245px 245px / 72px 72px 135px 135px;
-    background: repeating-linear-gradient(100deg, #382316 0, #55371f 4px, #3d2617 8px, #69462a 13px);
-    box-shadow: inset 0 0 0 4px #291b12, inset 0 0 0 7px #a17b4a, 0 16px 0 #291b13, 0 28px 45px #0009;
+    background:
+        linear-gradient(110deg, #24160e66, transparent 25% 75%, #24160e88),
+        repeating-linear-gradient(95deg, #4a2d1c 0 3px, #62402a 6px, #382316 12px, #56351f 19px);
+    box-shadow: inset 0 0 0 3px #24170f, inset 0 0 0 5px #c19b5c,
+        inset 0 0 0 7px #5e3e28, 0 16px 0 #291b13, 0 28px 45px #0009;
 }
 .felt {
     position: relative;
@@ -141,15 +144,18 @@ button:not(:disabled):active { transform: translateY(1px); }
     border: 2px solid #b99a61;
     border-radius: 88px 88px 225px 225px / 55px 55px 120px 120px;
     background:
-        radial-gradient(ellipse at 50% 32%, #286347 0%, #154b35 50%, #0c3426 100%);
-    box-shadow: inset 0 0 0 5px #082c20, inset 0 0 0 6px #cfb77955, inset 0 0 85px #041c13a8;
+        repeating-linear-gradient(45deg, #ffffff04 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(-45deg, #00000005 0 1px, transparent 1px 4px),
+        radial-gradient(ellipse at 50% 30%, #2c7052 0%, #17513b 52%, #0a3024 100%);
+    box-shadow: inset 0 0 0 4px #082c20, inset 0 0 0 5px #cfb77970,
+        inset 0 0 80px #041c13a8;
 }
 .felt::before {
     content: "";
     position: absolute;
     inset: 12px;
     pointer-events: none;
-    border: 1px solid #dfc79255;
+    border: 1px solid #dfc79270;
     border-radius: inherit;
 }
 .table-inscription { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #d5c28a; opacity: .2; pointer-events: none; white-space: nowrap; }
@@ -179,11 +185,11 @@ button:not(:disabled):active { transform: translateY(1px); }
     height: 102px;
     margin: 0 -7px;
     overflow: hidden;
-    border: 1px solid #e0d9c9;
-    border-radius: 6px;
-    background: linear-gradient(135deg, #fffef9, #e9e3d5);
-    box-shadow: 0 3px 0 #b8ad99, 0 8px 16px #001c16a8;
-    color: #162d27;
+    border: 1px solid #d5cbb7;
+    border-radius: 5px;
+    background: linear-gradient(145deg, #fffefa 25%, #f2ecdf);
+    box-shadow: inset 0 0 0 2px #ffffffb3, 0 2px 0 #b8ad99, 0 6px 12px #001c16a8;
+    color: #19332c;
 }
 .card.r { color: #a43137; }
 .card.dealt { animation: deal-card 200ms var(--ease-out) backwards; }
@@ -200,12 +206,23 @@ button:not(:disabled):active { transform: translateY(1px); }
 .card .card-corner.bottom { top: auto; left: auto; right: 7px; bottom: 6px; transform: rotate(180deg); }
 .card .card-corner b, .card .card-corner i { position: static; font: 700 16px/1 Georgia, serif; }
 .card .card-corner i { font-size: 12px; }
-.card .card-suit { font-size: 39px; }
+.card .card-suit { font-size: 39px; text-shadow: 0 1px 0 #fff; }
 .card.back {
-    border: 5px solid #f2ecdd;
-    background: repeating-linear-gradient(45deg, #87323a 0 3px, #a54b50 3px 4px, #702932 4px 7px);
+    border: 4px solid #f7f1e4;
+    background:
+        repeating-linear-gradient(45deg, transparent 0 3px, #e3c28a55 3px 4px, transparent 4px 7px),
+        repeating-linear-gradient(-45deg, transparent 0 3px, #e3c28a55 3px 4px, transparent 4px 7px),
+        #702b35;
 }
-.card.back span { inset: 8px; border: 1px solid #e4caa0a8; border-radius: 3px; color: #efd6ac; font-size: 30px; }
+.card.back span {
+    inset: 6px;
+    border: 1px solid #e4caa0c9;
+    border-radius: 3px;
+    background: radial-gradient(ellipse at center, #692631 0 37%, transparent 39%);
+    color: #f3d9aa;
+    font-size: 26px;
+    text-shadow: 0 1px #4e1821;
+}
 .card-placeholder {
     display: grid;
     place-items: center;
@@ -229,12 +246,21 @@ button:not(:disabled):active { transform: translateY(1px); }
 .hand-info { display: flex; align-items: center; justify-content: center; gap: 7px; color: #cbbf9a; font-size: 9px; font-weight: 700; }
 .player-hand { min-height: 112px; }
 .table-wager { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 34px; margin: 3px 0 7px; color: #f2dfad; font: 700 11px "Trebuchet MS", sans-serif; }
-.table-chip, .flying-chip { display: grid; place-items: center; width: 30px; height: 30px; border: 3px dashed #f3e5c7; border-radius: 50%; background: #ad453e; box-shadow: inset 0 0 0 2px #f7ddb98c, 0 3px 0 #712d28, 0 5px 8px #0006; color: #fff3d4; font: 700 10px Georgia, serif; }
+.table-chip, .flying-chip {
+    --chip-color: #9c3d3a;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 2px solid #e7d4ae;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--chip-color) 0 56%, transparent 58%),
+        repeating-conic-gradient(#f2e5ca 0 12deg, var(--chip-color) 12deg 45deg);
+    box-shadow: inset 0 0 0 2px #301d1a70, 0 3px 0 #351c18, 0 5px 8px #0006;
+    color: #fff8e9;
+    font: 700 10px Georgia, serif;
+}
 .flying-chip { position: fixed; z-index: 20; pointer-events: none; width: 42px; height: 42px; transform: translate(-50%, -50%); }
-.flying-chip.c10 { background: #346077; }
-.flying-chip.c50 { background: #a43e3b; }
-.flying-chip.c100 { background: #27302d; }
-.flying-chip.c500 { background: #725477; }
 .wager-empty { opacity: 0; }
 .betting-circle { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 78px; height: 78px; border: 1px dashed #d3c28d9c; border-radius: 50%; color: #dfc98c; font-size: 21px; }
 .betting-circle span { margin-top: 4px; font: 700 7px "Trebuchet MS", sans-serif; letter-spacing: .1em; }
@@ -265,15 +291,29 @@ button:not(:disabled):active { transform: translateY(1px); }
     place-items: center;
     width: 50px;
     height: 50px;
-    border: 4px dashed #f0e2c9;
-    box-shadow: inset 0 0 0 2px #ffffff7a, 0 4px 0 #06150e, 0 7px 12px #0006;
+    border: 2px solid #ebdbc1;
+    background: radial-gradient(circle, var(--chip-color) 0 57%, transparent 59%),
+        repeating-conic-gradient(#f2e5ca 0 12deg, var(--chip-color) 12deg 45deg);
+    box-shadow: inset 0 0 0 2px #301d1a70, 0 3px 0 #06150e, 0 6px 10px #0008;
     font-size: 11px;
 }
-.chip span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid #fff9; border-radius: 50%; }
-.c10 { background: #346077; }
-.c50 { background: #a43e3b; }
-.c100 { background: #27302d; }
-.c500 { background: #725477; }
+.chip span {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #f3e6cfb0;
+    border-radius: 50%;
+    background: var(--chip-color);
+    box-shadow: inset 0 0 0 2px #ffffff18;
+    color: #fffaf0;
+    text-shadow: 0 1px 2px #000a;
+}
+.c10 { --chip-color: #285d78; }
+.c50 { --chip-color: #9c3d3a; }
+.c100 { --chip-color: #293d39; }
+.c500 { --chip-color: #704e76; }
+.chip:disabled { filter: grayscale(.65); opacity: .4; cursor: not-allowed; }
 .pend { min-width: 100px; padding: 0 13px; border-left: 1px solid #b3bfa34d; text-align: left; }
 .pend > span { display: block; color: #a4b4a3; font-size: 8px; }
 .pend b { display: block; margin-top: 3px; color: var(--gold); font: 23px Georgia, serif; }
