@@ -287,6 +287,37 @@ button:not(:disabled):active { transform: translateY(1px); }
 .rules summary { display: flex; justify-content: space-between; gap: 20px; padding: 15px 0; border-top: 1px solid #d5bd8433; border-bottom: 1px solid #d5bd8433; color: var(--cream); cursor: pointer; font: 16px Georgia, serif; }
 .rules summary span { color: var(--gold); }
 .rules p { font: 13px/1.7 "Trebuchet MS", Arial, sans-serif; }
+.key-hint {
+    flex-basis: 100%;
+    margin: -7px 0 0;
+    color: #aeb9a9;
+    font-size: 11px;
+    line-height: 1.5;
+    text-align: right;
+}
+kbd {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 6px;
+    padding: 0 5px;
+    place-items: center;
+    border: 1px solid #d5bd8455;
+    border-radius: 3px;
+    background: #061b13;
+    color: #e4d4a9;
+    font: 700 10px/1 "Trebuchet MS", Arial, sans-serif;
+}
+.player-hand-group.active-hand {
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, #f0d48a12, transparent);
+}
+.ctrl .btn { min-height: 46px; }
+.ctrl .btn kbd { color: #f0e2c9; }
+.btn:focus-visible, .chip:focus-visible, .rules summary:focus-visible {
+    outline: 3px solid #f6d990;
+    outline-offset: 4px;
+}
 
 @media (max-width: 760px) {
     .wrap { padding: 0 18px; }
@@ -308,8 +339,172 @@ button:not(:disabled):active { transform: translateY(1px); }
     .player-hand { min-height: 100px; }
     .card .card-suit { font-size: 33px; }
     .control-area { flex-direction: column; align-items: stretch; padding-top: 35px; }
-    .ctrl { justify-content: flex-start; }
+    .ctrl { width: 100%; justify-content: flex-start; }
+    .ctrl .btn { flex: 1 1 130px; }
+    .chips { flex: 1 0 100%; justify-content: center; }
+    .key-hint { margin-top: 0; text-align: left; }
     .site-footer span:last-child { display: none; }
+}
+@media (max-width: 420px) {
+    .wrap { padding: 0 12px; }
+    .table { padding: 7px; }
+    .felt { padding: 24px 8px 27px; }
+    .seat { flex: 1 1 calc(50% - 8px); min-width: 90px; }
+    .card { flex-basis: 56px; width: 56px; height: 80px; margin: 0 -10px; }
+    .card-placeholder { width: 56px; height: 80px; }
+    .hand { flex-wrap: wrap; row-gap: 5px; }
+    .player-hand { min-height: 92px; }
+    .control-area { padding: 28px 0 18px; }
+    .pend { min-width: 85px; padding: 0 8px; }
+    .ctrl .btn { flex-basis: 110px; padding-right: 12px; padding-left: 12px; }
+}
+
+/* During a game the table and its controls share the available viewport. */
+body:has(#game:not([hidden])) .wrap {
+    max-width: 1440px;
+    height: 100vh;
+    height: 100dvh;
+    padding: 8px clamp(8px, 2vw, 24px);
+}
+body:has(#game:not([hidden])) .masthead,
+body:has(#game:not([hidden])) .rules,
+body:has(#game:not([hidden])) .site-footer,
+#game .table-inscription,
+#game .felt-bottom,
+#game .section-label > span,
+#game .control-heading > span { display: none; }
+#game:not([hidden]) {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+}
+#game .top { min-height: 0; padding: 0; gap: 8px; }
+#game .table-info { gap: 8px; }
+#game .table-info small { width: auto; padding: 0; }
+#game .top-actions .btn { min-height: 40px; }
+#game .table { min-height: 0; padding: 8px; }
+#game .felt {
+    height: 100%;
+    min-height: 0;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+}
+#game .dealer h3 { margin: 0 0 5px; font-size: 19px; }
+#game .msg { flex-shrink: 0; min-height: 0; margin: 5px 0; font-size: 17px; }
+#game .seats { flex-shrink: 0; width: 100%; }
+#game .seat { flex: 0 1 420px; width: 100%; max-width: 420px; min-width: 0; }
+#game .seat:not(.viewed-seat),
+#game .player-hand-group:not(.viewed-hand) { display: none; }
+#game .player-hands { display: block; }
+#game .player-hand-group { min-width: 0; }
+#game .hand { min-height: 0; flex-wrap: nowrap; }
+#game .player-hand { min-height: 0; }
+#game .card {
+    flex: 0 0 auto;
+    width: clamp(44px, 6vh, 68px);
+    height: clamp(64px, 8.8vh, 96px);
+    margin: 0;
+}
+#game .card + .card { margin-left: -10px; }
+#game .many-cards .card { width: 44px; height: 64px; }
+#game .many-cards .card + .card { margin-left: -33px; }
+#game .card .card-suit { font-size: clamp(25px, 4vh, 36px); }
+#game .card .card-corner b { font-size: 14px; }
+#game .card-placeholder { width: 48px; height: 68px; }
+#game .betting-circle { width: 60px; height: 60px; }
+#game .table-wager { min-height: 24px; margin: 3px 0; }
+#game .table-chip { width: 24px; height: 24px; }
+#game .seat-details { min-height: 0; padding: 5px 4px; }
+#game .seat-balance { margin-top: 3px; }
+#game .badge { margin-top: 3px; }
+#game .table-navigation { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+#game .table-navigation label { color: #e7d5ac; font-size: 12px; }
+#game .table-navigation select {
+    max-width: 145px;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 1px solid #d5bd8480;
+    border-radius: 3px;
+    background: #09291e;
+    color: #fff3d4;
+    font: inherit;
+}
+#game .table-navigation select:focus-visible { outline: 3px solid #f6d990; outline-offset: 3px; }
+#game .control-area {
+    padding: 0 0 4px;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px 12px;
+}
+#game .control-heading b { font-size: 16px; }
+#game .ctrl { flex: 1 1 auto; width: auto; min-width: 0; gap: 7px; }
+#game .ctrl .btn { min-height: 44px; flex: 0 1 auto; padding: 8px 12px; }
+#game .chips { flex: 0 0 auto; gap: 5px; }
+#game .chip { width: 44px; height: 44px; }
+#game .pend { min-width: 65px; padding: 0 7px; }
+#game .pend b { font-size: 19px; }
+#game .key-hint { margin: 0; }
+
+@media (max-width: 760px) {
+    #game .control-heading { display: none; }
+    #game .ctrl { width: 100%; justify-content: center; }
+    #game .ctrl .btn { flex: 1 1 auto; }
+    #game .key-hint { display: none; }
+    #game .table-info > span:not(.live-dot), #game .table-info small { display: none; }
+    #game .table-info b { padding-left: 0; border: 0; }
+    #game .ctrl kbd { display: none; }
+    #game .table-navigation { width: 100%; flex-wrap: nowrap; }
+    #game .table-navigation select { flex: 1 1 0; min-width: 0; }
+}
+@media (max-height: 600px) {
+    #game .felt { padding: 5px; }
+    #game .dealer h3 { margin-bottom: 0; font-size: 16px; }
+    #game .msg { margin: 2px 0; font-size: 14px; }
+    #game .card, #game .many-cards .card { width: 40px; height: 56px; }
+    #game .many-cards .card + .card { margin-left: -30px; }
+    #game .card-placeholder { width: 40px; height: 56px; }
+    #game .betting-circle { width: 45px; height: 45px; }
+    #game .seat:has(.hand-info) .table-wager { display: none; }
+    #game .seat-details { padding: 2px 4px; }
+    #game .seat h4 { font-size: 14px; }
+    #game .dealer small, #game .seat small { min-width: 20px; height: 20px; }
+    #game .table-navigation select { min-height: 30px; }
+    #game .player-hand-group { padding-top: 0; padding-bottom: 0; }
+    #game .player-hand-group .badge:not(.win):not(.lose):not(.push) { display: none; }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+    #game:not([hidden]) {
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 32%);
+        grid-template-rows: auto minmax(0, 1fr);
+    }
+    #game .top { grid-column: 1 / -1; }
+    #game .control-area { align-content: center; justify-content: center; }
+    #game .control-heading { display: none; }
+    #game .ctrl { justify-content: center; }
+    #game .key-hint { display: none; }
+}
+@media (max-height: 450px) and (max-width: 599px) {
+    #game .felt {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        align-items: center;
+        gap: 2px;
+    }
+    #game .msg { grid-column: 1 / -1; grid-row: 1; }
+    #game .table-navigation { grid-column: 1 / -1; grid-row: 2; }
+    #game .dealer { grid-column: 1; grid-row: 3; }
+    #game .seats { grid-column: 2; grid-row: 3; }
+    #game .many-cards .card + .card { margin-left: -37px; }
 }
 @media (prefers-reduced-motion: reduce) {
     button, button:not(:disabled):hover, button:not(:disabled):active { transform: none; transition: none; }

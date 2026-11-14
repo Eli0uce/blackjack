@@ -19,7 +19,7 @@ function openGame({reducedMotion = true} = {}) {
             markup = value;
             controls = {};
             chips = [];
-            for (const match of value.matchAll(/id="([^"]+)"/g)) controls[match[1]] = {textContent: ''};
+            for (const match of value.matchAll(/id="([^"]+)"/g)) controls[match[1]] = {textContent: '', focus() {}};
             for (const match of value.matchAll(/class="chip c\d+" data-v="(\d+)"/g)) {
                 chips.push({dataset: {v: match[1]}});
             }
@@ -28,12 +28,15 @@ function openGame({reducedMotion = true} = {}) {
     let activeTimer, sequence = 0;
     const flights = [];
     const wagerTarget = {getBoundingClientRect: () => ({left: 100, top: 150, width: 30, height: 30}), animate() {}};
+    const documentListeners = {};
     const document = {
         querySelector: selector => selector === '.my-wager .table-chip'
             ? (markup.includes('table-chip') ? wagerTarget : null)
             : elements[selector.slice(1)] || controls[selector.slice(1)] || null,
         querySelectorAll: selector => selector === '.chip' ? chips : [],
-        addEventListener() {},
+        addEventListener(type, listener) {
+            (documentListeners[type] ||= []).push(listener);
+        },
         body: {append(node) { flights.push(node); }},
         createElement: () => ({style: {}, setAttribute() {}, remove() { this.removed = true; },
             animate(frames, options) { this.frames = frames; this.options = options; return this.animation = {}; }})
@@ -66,7 +69,11 @@ function openGame({reducedMotion = true} = {}) {
     vm.createContext(context);
     vm.runInContext(engine, context);
     vm.runInContext(moduleScript + '\nglobalThis.testUI = {getRoom: () => room, render};', context);
-    return {html, elements, context, backend, flights, tick() { const timer = activeTimer; activeTimer = null; if (timer) timer.fn(); },
+    return {html, elements, context, backend, flights, key(key, target = {tagName: 'BODY'}) {
+            const event = {key, target, preventDefault() { this.defaultPrevented = true; }};
+            for (const listener of documentListeners.keydown || []) listener(event);
+            return event;
+        }, tick() { const timer = activeTimer; activeTimer = null; if (timer) timer.fn(); },
         get hasTimer() { return !!activeTimer; }, get markup() { return markup; }, get controls() { return controls; },
         get chips() { return chips; }};
 }
@@ -95,6 +102,24 @@ test('solo UI supports split, double and independent results', () => {
     assert.match(ui.markup, /Choisissez votre mise/);
 });
 
+test('keyboard shortcuts place bets and play a hand without affecting text fields', () => {
+    const ui = openGame({reducedMotion: false});
+    ui.key('1', {tagName: 'INPUT'});
+    ui.elements.solo.onclick();
+    ui.context.testUI.getRoom().deck = [...Array(160).fill(1), 7, 5, 9, 8];
+    ui.key('1');
+    ui.key('1');
+    assert.match(ui.markup, /MISE ACTUELLE<\/span><b[^>]*>20<\/b>/);
+    assert.match(ui.markup, /Échap effacer/);
+    assert.equal(ui.key('Enter').defaultPrevented, true);
+    assert.equal(ui.context.testUI.getRoom().phase, 'play');
+    assert.doesNotMatch(ui.markup, /\bdealt\b/);
+    assert.match(ui.markup, /aria-keyshortcuts="S"/);
+    ui.key('s');
+    assert.equal(ui.context.testUI.getRoom().phase, 'done');
+    assert.doesNotMatch(ui.markup, /\brevealed\b|\bresult-new\b/);
+});
+
 test('insurance is shown with a hidden dealer card and declined through UI', () => {
     const ui = openGame();
     ui.elements.solo.onclick();
@@ -120,6 +145,31 @@ test('multiplayer names are escaped in both turn and seat displays', () => {
     ui.context.testUI.render();
     assert.doesNotMatch(ui.markup, /<img src=x>/);
     assert.match(ui.markup, /&lt;img src=x&gt;/);
+});
+
+test('compact table navigation switches players and hands and follows the turn', () => {
+    const ui = openGame();
+    ui.elements.solo.onclick();
+    const room = ui.context.testUI.getRoom();
+    room.order.push('other');
+    room.players.other = ui.context.Blackjack.makePlayer('Bob', 'play');
+    const hand = () => ({cards: [9, 22], bet: 10, st: 'play', res: ''});
+    room.players.solo.hands = [hand(), hand()];
+    room.players.other.hands = [hand()];
+    room.phase = 'play';
+    room.turn = 'solo';
+    room.dealer = [5, 9];
+    ui.context.testUI.render();
+    assert.match(ui.markup, /value="0" selected>Moi \(vous\)/);
+    ui.controls['view-hand'].onchange({target: {value: '1'}});
+    assert.match(ui.markup, /viewed-hand">\s*<span class="hand-label">MAIN 2/);
+    ui.controls['view-player'].onchange({target: {value: '1'}});
+    assert.match(ui.markup, /value="1" selected>Bob/);
+    assert.match(ui.markup, /viewed-seat"><div class="player-hands">[\s\S]*?<h4>Bob<\/h4>/);
+    ui.controls['view-player'].onchange({target: {value: '0'}});
+    room.turn = 'other';
+    ui.context.testUI.render();
+    assert.match(ui.markup, /value="1" selected>Bob/);
 });
 
 test('online join and betting use the shared transactional engine', async () => {
